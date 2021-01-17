@@ -15,7 +15,7 @@ async fn index(req: HttpRequest) -> Result<NamedFile> {
 fn main() {
     match unsafe { fork() } {
         Ok(ForkResult::Parent { .. }) => {
-            println!("静态服务器启动成功")
+            println!("start success")
         }
         Ok(ForkResult::Child) => {
             let _ = start();
