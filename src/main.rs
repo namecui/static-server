@@ -1,35 +1,40 @@
-use actix_files::NamedFile;
-use actix_web::{web, App, HttpRequest, HttpServer, Result};
 use dotenv::dotenv;
-use nix::unistd::{fork, ForkResult};
-use std::env::var;
-use std::path::PathBuf;
+use std::env::args;
+use std::path::Path;
 
-async fn index(req: HttpRequest) -> Result<NamedFile> {
-    let base_url = var("STATIC_PATH").expect("localhost null");
-    let raw = req.match_info().query("filename");
-    let path: PathBuf = format!("{}{}", base_url, raw).parse().unwrap();
-    Ok(NamedFile::open(path)?)
-}
+mod server;
+mod sys;
+
+const SERVER_PID_DIR: &'static str = "./server.pid";
 
 fn main() {
-    match unsafe { fork() } {
-        Ok(ForkResult::Parent { .. }) => {
-            println!("start success")
-        }
-        Ok(ForkResult::Child) => {
-            let _ = start();
-        }
-        Err(_) => println!("Fork failed"),
-    }
-}
-
-#[actix_web::main]
-async fn start() -> std::io::Result<()> {
     dotenv().ok();
-    let local = var("LOCALHOST").expect("localhost null");
-    HttpServer::new(move || App::new().route("/{filename:.*}", web::get().to(index)))
-        .bind(local)?
-        .run()
-        .await
+    let mut stop: bool = false;
+    let mut start: bool = false;
+    for argument in args() {
+        if argument == "stop" {
+            stop = true;
+        }
+
+        if argument == "start" {
+            start = true;
+        }
+    }
+
+    let is_file = Path::new(SERVER_PID_DIR).is_file();
+    if stop {
+        if is_file {
+            sys::kill(SERVER_PID_DIR);
+        } else {
+            println!("pid file not found");
+        }
+    }
+
+    if start {
+        if is_file {
+            println!("server exists");
+        } else {
+            sys::fork(SERVER_PID_DIR)
+        }
+    }
 }
